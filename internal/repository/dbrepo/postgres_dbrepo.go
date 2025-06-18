@@ -65,9 +65,43 @@ func (m *PostgresDBRepo) AllMovies() ([]*models.Movie, error) {
 
 		movie.RuntimeMinutes = movie.RuntimeHours % 60
 		movie.RuntimeHours = movie.RuntimeHours / 60
-		
+
 		movies = append(movies, &movie)
 	}
 
 	return movies, nil
+}
+
+func (m *PostgresDBRepo) GetUserByEmail(email string) (*models.User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+		SELECT
+			ID, EMAIL, FIRST_NAME, LAST_NAME, PASSWORD,
+            CREATED_AT, UPDATED_AT 
+		FROM
+		    USERS
+		WHERE
+		    EMAIL = $1
+	`
+
+	var user models.User
+	row := m.DB.QueryRowContext(ctx, query, email)
+
+	err := row.Scan(
+		&user.ID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Password,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }
