@@ -142,7 +142,7 @@ func (app *application) refreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *application) DisplayMovie(w http.ResponseWriter, r *http.Request) {
+func (app *application) displayMovie(w http.ResponseWriter, r *http.Request) {
 	var requestPayload struct {
 		ID int `json:"id"`
 	}
@@ -160,5 +160,9 @@ func (app *application) DisplayMovie(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.writeJSON(w, http.StatusOK, movie)
+}
 
+func (app *application) logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, app.auth.GetExpiredRefreshCookie())
+	w.WriteHeader(http.StatusAccepted)
 }
