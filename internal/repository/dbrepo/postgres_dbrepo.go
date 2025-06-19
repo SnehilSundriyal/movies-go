@@ -139,3 +139,50 @@ func (m *PostgresDBRepo) GetUserByEmail(email string) (*models.User, error) {
 
 	return &user, nil
 }
+
+func (m *PostgresDBRepo) GetMovieByID(id int) (*models.Movie, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+		SELECT
+			ID, TITLE, RUNTIME, IMDB, RELEASE, MPAA, DESCRIPTION, CREATED_AT, UPDATED_AT, POSTER, IMDB_ID
+		FROM 
+		    MOVIES
+		WHERE 
+		    ID = $1
+`
+
+	var movie models.Movie
+	row := m.DB.QueryRowContext(ctx, query, id)
+
+	var tempVar int
+
+	err := row.Scan(
+		&movie.ID,
+		&movie.Title,
+		&tempVar,
+		&movie.IMDb,
+		&movie.Release,
+		&movie.MPAA,
+		&movie.Description,
+		&movie.CreatedAt,
+		&movie.UpdatedAt,
+		&movie.Poster,
+		&movie.IMDbID,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if movie.Poster != "" {
+		cleanPoster := strings.TrimSpace(movie.Poster)
+		movie.Poster = "http://localhost:8080/static/images/" + cleanPoster
+	}
+
+	movie.RuntimeMinutes = tempVar % 60
+	movie.RuntimeHours = tempVar / 60
+
+	return &movie, nil
+}

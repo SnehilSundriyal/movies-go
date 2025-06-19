@@ -9,6 +9,7 @@ type Movie struct {
 	RuntimeHours   int       `json:"runtime"`
 	RuntimeMinutes int       `json:"runtime_minutes"`
 	IMDb           float32   `json:"imdb"`
+	IMDbID         string    `json:"imdbId"`
 	Release        int       `json:"release"`
 	MPAA           string    `json:"mpaa"`
 	Description    string    `json:"description"`

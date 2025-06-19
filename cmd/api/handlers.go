@@ -48,6 +48,7 @@ func (app *application) authenticate(w http.ResponseWriter, r *http.Request) {
 	err := app.readJSON(w, r, &requestPayload)
 	if err != nil {
 		app.errorJSON(w, err, http.StatusBadRequest)
+		log.Println(1)
 		return
 	}
 
@@ -55,6 +56,7 @@ func (app *application) authenticate(w http.ResponseWriter, r *http.Request) {
 	user, err := app.DB.GetUserByEmail(requestPayload.Email)
 	if err != nil {
 		app.errorJSON(w, errors.New("invalid credentials"), http.StatusBadRequest)
+		log.Println(2)
 		return
 	}
 
@@ -62,11 +64,13 @@ func (app *application) authenticate(w http.ResponseWriter, r *http.Request) {
 	valid, err := user.ValidatePassword(requestPayload.Password)
 	if err != nil {
 		app.errorJSON(w, err, http.StatusBadRequest)
+		log.Println(3)
 		return
 	}
 
 	if !valid {
 		app.errorJSON(w, errors.New("invalid credentials"), http.StatusBadRequest)
+		log.Println(4)
 		return
 	}
 
@@ -136,4 +140,25 @@ func (app *application) refreshToken(w http.ResponseWriter, r *http.Request) {
 			app.writeJSON(w, http.StatusOK, user)
 		}
 	}
+}
+
+func (app *application) DisplayMovie(w http.ResponseWriter, r *http.Request) {
+	var requestPayload struct {
+		ID int `json:"id"`
+	}
+	err := app.readJSON(w, r, &requestPayload)
+
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	movie, err := app.DB.GetMovieByID(requestPayload.ID)
+	if err != nil {
+		app.errorJSON(w, errors.New("movie not found"), http.StatusNotFound)
+		return
+	}
+
+	app.writeJSON(w, http.StatusOK, movie)
+
 }
