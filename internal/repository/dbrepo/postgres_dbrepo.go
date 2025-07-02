@@ -25,7 +25,7 @@ func (m *PostgresDBRepo) AllMovies() ([]*models.Movie, error) {
 	query := `
     	SELECT 
     	    ID, TITLE, RUNTIME, IMDb, RELEASE, MPAA, DESCRIPTION, 
-    	    COALESCE(poster, ''), CREATED_AT, UPDATED_AT 
+    	    COALESCE(poster, ''), CREATED_AT, UPDATED_AT, IMDB_ID
     	FROM 
     	    MOVIES
     	ORDER BY
@@ -53,12 +53,12 @@ func (m *PostgresDBRepo) AllMovies() ([]*models.Movie, error) {
 			&movie.Poster,
 			&movie.CreatedAt,
 			&movie.UpdatedAt,
+			&movie.IMDbID,
 		)
 		if err != nil {
 			return nil, err
 		}
 		if movie.Poster != "" {
-			// Remove any whitespace/newlines and construct absolute URL
 			cleanPoster := strings.TrimSpace(movie.Poster)
 			movie.Poster = "http://localhost:8080/static/images/" + cleanPoster
 		}
@@ -70,6 +70,205 @@ func (m *PostgresDBRepo) AllMovies() ([]*models.Movie, error) {
 	}
 
 	return movies, nil
+}
+
+func (m *PostgresDBRepo) OneMovie(id int) (*models.Movie, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+		SELECT 
+			id, title, release, runtime, imdb, mpaa, description,
+			COALESCE(poster, ''), created_at, updated_at, imdb_id
+		FROM 
+		    MOVIES
+		WHERE
+		    ID = $1
+    `
+
+	row := m.DB.QueryRowContext(ctx, query, id)
+
+	var movie models.Movie
+	err := row.Scan(
+		&movie.ID,
+		&movie.Title,
+		&movie.Release,
+		&movie.RuntimeHours,
+		&movie.IMDb,
+		&movie.MPAA,
+		&movie.Description,
+		&movie.Poster,
+		&movie.CreatedAt,
+		&movie.UpdatedAt,
+		&movie.IMDbID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if movie.Poster != "" {
+		cleanPoster := strings.TrimSpace(movie.Poster)
+		movie.Poster = "http://localhost:8080/static/images/" + cleanPoster
+	}
+
+	movie.RuntimeMinutes = movie.RuntimeHours % 60
+	movie.RuntimeHours = movie.RuntimeHours / 60
+
+	// get genres, if any
+	query = `
+		SELECT 
+		    g.id, g.genre
+		FROM 
+		    MOVIES_GENRES mg 
+		LEFT JOIN 
+			GENRES g 
+		ON 
+			(mg.genre_id = g.id)
+		WHERE
+		    mg.movie_id = $1
+		ORDER BY
+		    g.genre
+`
+
+	rows, err := m.DB.QueryContext(ctx, query, id)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var genres []*models.Genre
+	for rows.Next() {
+		var g models.Genre
+		err := rows.Scan(
+			&g.ID,
+			&g.Genre,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		genres = append(genres, &g)
+	}
+
+	movie.Genres = genres
+
+	return &movie, err
+
+}
+
+func (m *PostgresDBRepo) OneMovieForEdit(id int) (*models.Movie, []*models.Genre, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+		SELECT 
+			id, title, release, runtime, imdb, mpaa, description,
+			COALESCE(poster, ''), created_at, updated_at, imdb_id
+		FROM 
+		    MOVIES
+		WHERE
+		    ID = $1
+    `
+
+	row := m.DB.QueryRowContext(ctx, query, id)
+
+	var movie models.Movie
+	err := row.Scan(
+		&movie.ID,
+		&movie.Title,
+		&movie.Release,
+		&movie.RuntimeHours,
+		&movie.IMDb,
+		&movie.MPAA,
+		&movie.Description,
+		&movie.Poster,
+		&movie.CreatedAt,
+		&movie.UpdatedAt,
+		&movie.IMDbID,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if movie.Poster != "" {
+		cleanPoster := strings.TrimSpace(movie.Poster)
+		movie.Poster = "http://localhost:8080/static/images/" + cleanPoster
+	}
+
+	movie.RuntimeMinutes = movie.RuntimeHours % 60
+	movie.RuntimeHours = movie.RuntimeHours / 60
+
+	// get genres, if any
+	query = `
+		SELECT 
+		    g.id, g.genre
+		FROM 
+		    MOVIES_GENRES mg 
+		LEFT JOIN 
+			GENRES g 
+		ON 
+			(mg.genre_id = g.id)
+		WHERE
+		    mg.movie_id = $1
+		ORDER BY
+		    g.genre
+`
+
+	rows, err := m.DB.QueryContext(ctx, query, id)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var genres []*models.Genre
+	var genresArray []int
+	for rows.Next() {
+		var g models.Genre
+		err := rows.Scan(
+			&g.ID,
+			&g.Genre,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		genres = append(genres, &g)
+		genresArray = append(genresArray, g.ID)
+	}
+
+	movie.Genres = genres
+	movie.GenresArray = genresArray
+
+	var allGenres []*models.Genre
+	query = `
+		SELECT 
+		    ID, GENRE
+		FROM 
+		    GENRES
+		ORDER BY
+		    GENRE
+    `
+	gRows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer gRows.Close()
+
+	for gRows.Next() {
+		var g models.Genre
+		err := gRows.Scan(
+			&g.ID,
+			&g.Genre,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		allGenres = append(allGenres, &g)
+	}
+
+	return &movie, allGenres, err
+
 }
 
 func (m *PostgresDBRepo) GetUserByID(id int) (*models.User, error) {

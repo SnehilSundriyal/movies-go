@@ -19,10 +19,12 @@ func (app *application) routes() http.Handler {
 	mux.Get("/refresh", app.refreshToken)
 	mux.Post("/movie", app.displayMovie)
 	mux.Get("/logout", app.logout)
+	mux.Get("/movies/{id}", app.GetMovie)
 
 	mux.Route("/admin", func(mux chi.Router) {
 		mux.Use(app.authRequired)
 		mux.Get("/movies", app.MovieCatalog)
+		mux.Get("/movies/{id}", app.MovieForEdit)
 	})
 
 	// Serve static files
