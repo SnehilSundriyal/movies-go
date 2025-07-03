@@ -153,7 +153,6 @@ func (m *PostgresDBRepo) OneMovie(id int) (*models.Movie, error) {
 	movie.Genres = genres
 
 	return &movie, err
-
 }
 
 func (m *PostgresDBRepo) OneMovieForEdit(id int) (*models.Movie, []*models.Genre, error) {
@@ -384,4 +383,53 @@ func (m *PostgresDBRepo) GetMovieByID(id int) (*models.Movie, error) {
 	movie.RuntimeHours = tempVar / 60
 
 	return &movie, nil
+}
+
+func (m *PostgresDBRepo) AllGenres() ([]*models.Genre, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+		SELECT 
+			ID, GENRE, CREATED_AT, UPDATED_AT
+		FROM
+		    GENRES
+		ORDER BY
+		    GENRE
+`
+
+	rows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var genres []*models.Genre
+
+	for rows.Next() {
+		var g models.Genre
+		err := rows.Scan(
+			&g.ID,
+			&g.Genre,
+			&g.CreatedAt,
+			&g.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		genres = append(genres, &g)
+	}
+
+	return genres, nil
+}
+
+func (m *PostgresDBRepo) InsertMovie(movie models.Movie) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	stmt := `
+		INSERT INTO
+			MOVIES (title, description, release, runtime, mpaa, imdb,)
+`
 }

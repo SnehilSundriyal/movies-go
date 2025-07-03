@@ -57,7 +57,15 @@ func main() {
 		CookieDomain:  app.CookieDomain,
 	}
 
-	log.Println("Starting application on port:", port, "")
+	log.Println("Starting API on port 8080...")
+	log.Println(`
+  ______    ______       ______    ______   __
+ /\  ___\  /\  __ \     /\  __ \  /\  == \ /\ \
+ \ \ \__\\ \ \ \/\ \    \ \ \_\ \ \ \  __/ \ \ \
+  \ \_____\ \ \_____\    \ \_\ \_\ \ \_\    \ \_\
+   \/_____/  \/_____/     \/_/\/_/  \/_/     \/_/
+
+`)
 
 	// start a web server
 	err = http.ListenAndServe(fmt.Sprintf(":%d", port), app.routes())
