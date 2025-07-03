@@ -1,16 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v4"
-	"io"
 	"log"
 	"net/http"
-	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 	"watch-a-movie/internal/models"
 )
@@ -248,15 +246,31 @@ func (app *application) InsertMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if movie.IMDbID != "" {
+		movie.IMDbID = extractIMDbIdFromLink(movie.IMDbID)
+
+		if movie.IMDbID == "" {
+			app.errorJSON(w, errors.New("invalid IMDb ID format"))
+			return
+		}
+	}
 	// try to get an image
-	movie = app.GetPoster(movie)
 
 	movie.CreatedAt = time.Now()
 	movie.UpdatedAt = time.Now()
 
-	movie.RuntimeHours = movie.RuntimeHours*60 + movie.RuntimeMinutes
+	newID, err := app.DB.InsertMovie(movie)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
 
 	// now handle genres
+	err = app.DB.UpdateMovieGenres(newID, movie.GenresArray)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
 
 	resp := JSONResponse{
 		Error:   false,
@@ -266,46 +280,15 @@ func (app *application) InsertMovie(w http.ResponseWriter, r *http.Request) {
 	app.writeJSON(w, http.StatusAccepted, resp)
 }
 
-func (app *application) GetPoster(movie models.Movie) models.Movie {
-	type TheMovieDB struct {
-		Page    int `json:"page"`
-		Results []struct {
-			PosterPath string `json:"poster_path"`
-		} `json:"results"`
-		TotalPages int `json:"total_pages"`
+func extractIMDbIdFromLink(imdbLink string) string {
+	imdbLink = strings.TrimSpace(imdbLink)
+
+	if strings.HasPrefix(imdbLink, "tt") && !strings.Contains(imdbLink, "/") {
+		return imdbLink
 	}
 
-	client := &http.Client{}
-	theUrl := fmt.Sprintf("https://api.themoviedb.org/3/searc/movie?api_key=%s", app.APIKey)
+	re := regexp.MustCompile(`tt\d+`)
+	match := re.FindString(imdbLink)
 
-	req, err := http.NewRequest("GET", theUrl+"&query"+url.QueryEscape(movie.Title), nil)
-	if err != nil {
-		log.Println(err)
-		return movie
-	}
-
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Println(err)
-		return movie
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Println(err)
-		return movie
-	}
-
-	var responseObject TheMovieDB
-	json.Unmarshal(bodyBytes, &responseObject)
-
-	if len(responseObject.Results) > 0 {
-		movie.Poster = responseObject.Results[0].PosterPath
-	}
-
-	return movie
+	return match
 }
