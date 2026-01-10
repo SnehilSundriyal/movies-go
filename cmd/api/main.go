@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 	"watch-a-movie/internal/repository"
 	"watch-a-movie/internal/repository/dbrepo"
@@ -27,10 +28,27 @@ func main() {
 	// set application config
 	var app application
 
-	// read from the command line
-	flag.StringVar(&app.DSN, "dsn", "host=localhost port=5432 user=snehil password=hello dbname=movies sslmode=disable timezone=UTC connect_timeout=5", "Postgres connection string")
+	// Get DSN from environment variable, fallback to local default
+	dsnFromEnv := os.Getenv("DATABASE_URL")
+	if dsnFromEnv == "" {
+		dsnFromEnv = "host=localhost port=5432 user=snehil password=hello dbname=movies sslmode=disable timezone=UTC connect_timeout=5"
+	}
 
-	flag.StringVar(&app.JWTSecret, "jwt-secret", "very-secret", "signing secret for JWT")
+	// Get JWT secret from environment variable
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "very-secret"
+	}
+
+	// Get allowed origin from environment variable
+	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://localhost:5173"
+	}
+
+	// read from the command line (with environment variable defaults)
+	flag.StringVar(&app.DSN, "dsn", dsnFromEnv, "Postgres connection string")
+	flag.StringVar(&app.JWTSecret, "jwt-secret", jwtSecret, "signing secret for JWT")
 	flag.StringVar(&app.JWTIssuer, "jwt-issuer", "example.com", "signing issuer for JWT")
 	flag.StringVar(&app.JWTAudience, "jwt-audience", "example.com", "signing audience for JWT")
 	flag.StringVar(&app.CookieDomain, "cookie-domain", "localhost", "cookie domain for JWT")
